@@ -993,28 +993,21 @@ function applyMetrics(cpuR, memR) {
 // ── Real fetch from Prometheus metrics endpoint ─────────────────────
 async function fetchMetrics() {
   try {
-    const res = await fetch(METRICS_URL, { signal: AbortSignal.timeout(4000) });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const text = await res.text();
-    const parsed = parsePrometheus(text);
-    const cpuR = extractCPU(parsed);
-    const memR = extractMemory(parsed);
-    if (cpuR === null || memR === null) throw new Error('Metrics not found in response');
+    const res = await fetch(METRICS_URL);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+
+    const data = await res.json();
+
+    const cpuR = parseFloat(data.cpuUsage);
+    const memR = Math.round(
+      (parseFloat(data.usedMemory) / parseFloat(data.totalMemory)) * 100
+    );
 
     usingRealData = true;
     lastFetchTime = Date.now();
     applyMetrics(cpuR, memR);
     setSourceIndicator(true);
 
-    // Also update latency/rps if present
-    const latency = parsed['http_request_duration_seconds']?.[0]?.val;
-    if (latency) {
-      const latMs = Math.round(latency * 1000);
-      document.getElementById('latency-stat').innerHTML = latMs+'<span style="font-size:20px;font-weight:600">ms</span>';
-      document.getElementById('avg-latency').textContent = latMs+'ms';
-    }
-    const rpsVal = parsed['http_requests_total']?.[0]?.val;
-    if (rpsVal) document.getElementById('rps').textContent = Math.round(rpsVal).toLocaleString();
 
   } catch (err) {
     // Graceful fallback — simulate realistic values
